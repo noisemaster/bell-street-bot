@@ -54,6 +54,11 @@ bot.on('messageCreate', async msg => {
             return;
         }
 
+        if (turnipPrice < 0) {
+            await msg.channel.createMessage('Turnip price given is negative')
+            return;
+        }
+
         const turnip = new TurnipPrice();
         turnip.price = turnipPrice;
         turnip.dateAdded = timestamp.toDate();
