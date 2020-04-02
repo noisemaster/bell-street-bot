@@ -54,7 +54,7 @@ bot.on('messageCreate', async msg => {
             return;
         }
 
-        if (turnipPrice < 0) {
+        if (turnipPrice <= 0) {
             await msg.channel.createMessage('Turnip price given is negative')
             return;
         }
@@ -106,6 +106,55 @@ bot.on('messageCreate', async msg => {
                 author: {
                     name: msg.author.username,
                     icon_url: msg.author.avatarURL
+                },
+                color: 0xd38c3f
+            }
+        });
+    } else if (msg.content.startsWith('t!peek')) {
+        const { mentions } = msg;
+        if (mentions.length === 0) {
+            await msg.channel.createMessage('`t!peek <@mention>`');
+            return;
+        }
+
+        const [mentionedUser] = mentions;
+        const timeStart = moment().day('Sunday').startOf('day').toDate();
+        const timeEnd = moment().day('Saturday').endOf('day').toDate();
+        const user = await User.findOne({
+            where: {
+                discordId: mentionedUser.id
+            }
+        });
+
+        if (!user) {
+            await msg.channel.createMessage('User hasn\'t submitted any turnip prices');
+            return;
+        }
+
+        const turnips = await TurnipPrice.find({
+            where: {
+                dateAdded: Between(timeStart, timeEnd),
+                user
+            },
+            order: {
+                dateAdded: 'ASC'
+            }
+        });
+
+        const formattedTurnips = turnips.map(x => {
+            const time = moment(x.dateAdded);
+            const timeframe = time.hour() > 12 ? 'PM' : 'AM';
+
+            return `${time.format('dddd MMMM D')} ${timeframe} - ${x.price} Bells`;
+        }).join('\n');
+
+        await bot.createMessage(msg.channel.id, {
+            embed: {
+                title: `${mentionedUser.username}'s Turnip Prices`,
+                description: formattedTurnips,
+                author: {
+                    name: mentionedUser.username,
+                    icon_url: mentionedUser.avatarURL
                 },
                 color: 0xd38c3f
             }
