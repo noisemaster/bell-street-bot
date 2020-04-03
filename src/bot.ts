@@ -67,49 +67,7 @@ bot.on('messageCreate', async msg => {
 
         await msg.channel.createMessage('✅ Saved')
     } else if (msg.content.startsWith('t!view')) {
-        const timeStart = moment().day('Sunday').startOf('day').toDate();
-        const timeEnd = moment().day('Saturday').endOf('day').toDate();
-        const user = await User.findOne({
-            where: {
-                discordId: msg.author.id
-            }
-        });
-
-        if (!user) {
-            await msg.channel.createMessage('You haven\'t entered a turnip price, use t!turnip for help');
-            return;
-        }
-
-        const turnips = await TurnipPrice.find({
-            where: {
-                dateAdded: Between(timeStart, timeEnd),
-                user
-            },
-            order: {
-                dateAdded: 'ASC'
-            }
-        });
-
-        console.log(turnips);
-
-        const formattedTurnips = turnips.map(x => {
-            const time = moment(x.dateAdded);
-            const timeframe = time.hour() > 12 ? 'PM' : 'AM';
-
-            return `${time.format('dddd MMMM D')} ${timeframe} - ${x.price} Bells`;
-        }).join('\n');
-
-        await bot.createMessage(msg.channel.id, {
-            embed: {
-                title: `${msg.author.username}'s Turnip Prices`,
-                description: formattedTurnips,
-                author: {
-                    name: msg.author.username,
-                    icon_url: msg.author.avatarURL
-                },
-                color: 0xd38c3f
-            }
-        });
+        await getTurnipPrice(msg.author, msg)
     } else if (msg.content.startsWith('t!peek')) {
         const { mentions } = msg;
         if (mentions.length === 0) {
@@ -118,48 +76,53 @@ bot.on('messageCreate', async msg => {
         }
 
         const [mentionedUser] = mentions;
-        const timeStart = moment().day('Sunday').startOf('day').toDate();
-        const timeEnd = moment().day('Saturday').endOf('day').toDate();
-        const user = await User.findOne({
-            where: {
-                discordId: mentionedUser.id
-            }
-        });
-
-        if (!user) {
-            await msg.channel.createMessage('User hasn\'t submitted any turnip prices');
-            return;
-        }
-
-        const turnips = await TurnipPrice.find({
-            where: {
-                dateAdded: Between(timeStart, timeEnd),
-                user
-            },
-            order: {
-                dateAdded: 'ASC'
-            }
-        });
-
-        const formattedTurnips = turnips.map(x => {
-            const time = moment(x.dateAdded);
-            const timeframe = time.hour() > 12 ? 'PM' : 'AM';
-
-            return `${time.format('dddd MMMM D')} ${timeframe} - ${x.price} Bells`;
-        }).join('\n');
-
-        await bot.createMessage(msg.channel.id, {
-            embed: {
-                title: `${mentionedUser.username}'s Turnip Prices`,
-                description: formattedTurnips,
-                author: {
-                    name: mentionedUser.username,
-                    icon_url: mentionedUser.avatarURL
-                },
-                color: 0xd38c3f
-            }
-        });
+        await getTurnipPrice(mentionedUser, msg);
     }
 });
+
+const getTurnipPrice = async (user: Eris.User, msg: Eris.Message) => {
+    const timeStart = moment().day('Sunday').startOf('day').toDate();
+    const timeEnd = moment().day('Saturday').endOf('day').toDate();
+    const dbUser = await User.findOne({
+        where: {
+            discordId: user.id
+        }
+    });
+
+    if (!dbUser) {
+        await msg.channel.createMessage('User hasn\'t submitted any turnip prices');
+        return;
+    }
+
+    const turnips = await TurnipPrice.find({
+        where: {
+            dateAdded: Between(timeStart, timeEnd),
+            user: dbUser
+        },
+        order: {
+            dateAdded: 'ASC'
+        }
+    });
+
+    const formattedTurnips = turnips.map(x => {
+        const time = moment(x.dateAdded);
+        const timeframe = time.hour() > 12 ? 'PM' : 'AM';
+
+        return `${time.format('dddd MMMM D')} ${timeframe} - ${x.price} Bells`;
+    }).join('\n');
+
+    await bot.createMessage(msg.channel.id, {
+        embed: {
+            title: `${user.username}'s Turnip Prices`,
+            description: formattedTurnips,
+            author: {
+                name: user.username,
+                icon_url: user.avatarURL
+            },
+            color: 0xd38c3f
+        }
+    });
+
+}
 
 export default bot;
