@@ -3,6 +3,7 @@ import { User } from "./models/User";
 import moment from 'moment';
 import { TurnipPrice } from "./models/TurnipPrice";
 import { Between } from 'typeorm';
+import { TurnipBuy } from "./models/TurnipBuy";
 
 const bot = Eris(process.env.DISCORD_TOKEN);
 
@@ -65,9 +66,10 @@ bot.on('messageCreate', async msg => {
         turnip.user = user;
         await turnip.save();
 
-        await msg.channel.createMessage('✅ Saved')
+        await msg.channel.createMessage('✅ Saved');
     } else if (msg.content.startsWith('t!view')) {
         await getTurnipPrice(msg.author, msg)
+        await getTurnipBuys(msg.author, msg)
     } else if (msg.content.startsWith('t!peek')) {
         const { mentions } = msg;
         if (mentions.length === 0) {
@@ -77,8 +79,107 @@ bot.on('messageCreate', async msg => {
 
         const [mentionedUser] = mentions;
         await getTurnipPrice(mentionedUser, msg);
+    } else if (msg.content.startsWith('t!buy')) {
+        let user = await User.findOne({
+            where: {
+                discordId: msg.author.id
+            }
+        });
+
+        if (!user) {
+            user = new User();
+            user.discordId = msg.author.id;
+            user.name = msg.author.username;
+            await user.save();
+        }
+
+        const saveTime = moment().day('Sunday').hour(9).startOf('hour').toDate();
+        const rawContent = msg.content.replace('t!buy', '').trim();
+        const args = rawContent.toLowerCase().split(' ');
+        
+        console.log(args);
+        if (args.length < 2) {
+            await msg.channel.createMessage('Expected Format\n`t!buy <turnips bought> <price bought>`')
+            return
+        }
+
+        const amount = parseInt(args[0]);
+        const price = parseInt(args[1]);
+
+        if (isNaN(amount) || isNaN(price)) {
+            await msg.channel.createMessage('Expected Format\n`t!buy <turnips bought> <price bought>`')
+            return
+        }
+
+        if (amount < 0) {
+            await msg.channel.createMessage('You can\'t buy a negative amount of turnips')
+            return
+        }
+
+        if (price < 0) {
+            await msg.channel.createMessage('You can\'t buy with a negative price')
+            return
+        }
+
+        const buy = new TurnipBuy();
+        buy.amount = amount;
+        buy.price = price;
+        buy.datePurchased = saveTime;
+        buy.user = user;
+        await buy.save();
+
+        await msg.channel.createMessage('✅ Saved');
     }
 });
+
+const getTurnipBuys = async (user: Eris.User, msg: Eris.Message) => {
+    const timeStart = moment().day('Sunday').startOf('day').toDate();
+    const timeEnd = moment().day('Saturday').endOf('day').toDate();
+    const dbUser = await User.findOne({
+        where: {
+            discordId: user.id
+        }
+    });
+
+    if (!dbUser) {
+        await msg.channel.createMessage('User hasn\'t submitted any turnip prices');
+        return;
+    }
+
+    const buys = await TurnipBuy.find({
+        where: {
+            datePurchased: Between(timeStart, timeEnd),
+            user: dbUser
+        },
+        order: {
+            datePurchased: 'ASC'
+        }
+    });
+
+    if (buys.length === 0) {
+        return;
+    }
+
+    const formattedBuys = buys.map(x => {
+        return `${x.amount}@${x.price} Bells for ${x.amount * x.price} Bells`;
+    }).join('\n');
+
+    const total = buys.reduce((acc, buy) => acc + (buy.amount * buy.price), 0);
+
+    const totalBuy = `Total: ${total} Bells`;
+
+    await bot.createMessage(msg.channel.id, {
+        embed: {
+            title: `${user.username}'s Turnip Buys`,
+            description: `${formattedBuys}\n${totalBuy}`,
+            author: {
+                name: user.username,
+                icon_url: user.avatarURL
+            },
+            color: 0xd38c3f
+        }
+    });
+};
 
 const getTurnipPrice = async (user: Eris.User, msg: Eris.Message) => {
     const timeStart = moment().day('Sunday').startOf('day').toDate();
@@ -122,7 +223,6 @@ const getTurnipPrice = async (user: Eris.User, msg: Eris.Message) => {
             color: 0xd38c3f
         }
     });
-
 }
 
 export default bot;
