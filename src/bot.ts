@@ -67,6 +67,31 @@ bot.on('messageCreate', async msg => {
         await turnip.save();
 
         await msg.channel.createMessage('✅ Saved');
+
+        const timeStart = moment().day('Sunday').startOf('day').toDate();
+        const timeEnd = moment().day('Saturday').endOf('day').toDate();
+    
+        const buys = await TurnipBuy.find({
+            where: {
+                datePurchased: Between(timeStart, timeEnd),
+                user: user
+            },
+            order: {
+                datePurchased: 'ASC'
+            }
+        });
+    
+        if (buys.length === 0) {
+            return;
+        }
+
+        const totalBells = buys.reduce((acc, buy) => acc + (buy.amount * buy.price), 0);
+        const totalTurnips = buys.reduce((acc, buy) => acc + buy.amount, 0);
+
+        const perspectiveSell = totalTurnips * turnipPrice;
+        const sellDifference = perspectiveSell - totalBells;
+
+        await msg.channel.createMessage(`If you sell your ${totalTurnips} turnips now, you'll get ${perspectiveSell} Bells (a ${sellDifference > 0 ? 'profit' : 'loss'} of ${Math.abs(sellDifference)} Bells)`);
     } else if (msg.content.startsWith('t!view')) {
         await getTurnipPrice(msg.author, msg)
         await getTurnipBuys(msg.author, msg)
