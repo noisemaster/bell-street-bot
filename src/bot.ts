@@ -309,17 +309,24 @@ const getTurnipPrice = async (user: Eris.User, msg: Eris.Message) => {
         return `${time.format('dddd MMMM D')} ${timeframe} - ${x.price} Bells`;
     }).join('\n');
 
-    await bot.createMessage(msg.channel.id, {
-        embed: {
-            title: `${user.username}'s Turnip Prices`,
-            description: formattedTurnips,
-            author: {
-                name: user.username,
-                icon_url: user.avatarURL
-            },
-            color: 0xd38c3f
-        }
-    });
+    const prophetFormat = turnips.map(({price}) => price).join('.');
+
+    if (turnips.length > 0) {
+        await bot.createMessage(msg.channel.id, {
+            embed: {
+                title: `${user.username}'s Turnip Prices`,
+                description: formattedTurnips + `\n[View Prophet](https://turnipprophet.io?prices=${prophetFormat})`,
+                author: {
+                    name: user.username,
+                    icon_url: user.avatarURL
+                },
+                color: 0xd38c3f
+            }
+        });
+    } else {
+        await msg.channel.createMessage('User hasn\'t submitted any turnip prices this week');
+        return;
+    }
 }
 
 export default bot;
