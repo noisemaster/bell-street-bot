@@ -1,4 +1,4 @@
-import Eris from "eris";
+import Eris, { VoiceChannel } from "eris";
 import { User } from "./models/User";
 import moment from 'moment';
 import { TurnipPrice } from "./models/TurnipPrice";
@@ -309,7 +309,15 @@ const getTurnipPrice = async (user: Eris.User, msg: Eris.Message) => {
         return `${time.format('dddd MMMM D')} ${timeframe} - ${x.price} Bells`;
     }).join('\n');
 
-    const prophetFormat = turnips.map(({price}) => price).join('.');
+    const prophetFormat = turnips.reduce((acc, {price}, index) => {
+        if (index > 1) {
+            const totalMissingTurnips = getMissingTurnipsCount(turnips[index - 1], turnips[index]);
+            for (let i = 0; i < totalMissingTurnips; i++) {
+                acc.push('')
+            }
+        }
+        return [...acc, price];
+    }, []).join('.');
 
     if (turnips.length > 0) {
         await bot.createMessage(msg.channel.id, {
@@ -327,6 +335,31 @@ const getTurnipPrice = async (user: Eris.User, msg: Eris.Message) => {
         await msg.channel.createMessage('User hasn\'t submitted any turnip prices this week');
         return;
     }
+}
+
+const getMissingTurnipsCount = (prevTurnip: TurnipPrice, currTurnip: TurnipPrice) => {
+    const startDate = moment(prevTurnip.dateAdded);
+    const endDate = moment(currTurnip.dateAdded);
+
+    let val = 0;
+    let seek = startDate.clone();
+
+    while (seek.isBefore(endDate)) {
+        const currentSeekHour = seek.hour();
+        if (currentSeekHour === 9) {
+            seek = seek.hour(13);
+        } else if (currentSeekHour === 13) {
+            seek = seek.add(1, "day").hour(9);
+        }
+
+        if (seek.isSame(endDate)) {
+            return val;
+        } else {
+            val += 1;
+        }
+    }
+
+    return val;
 }
 
 export default bot;
